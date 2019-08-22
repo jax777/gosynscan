@@ -230,16 +230,21 @@ func (s *scanner) scan(ports []layers.TCPPort) error {
 	// against it and discard useless packets.
 	ipFlow := gopacket.NewFlow(layers.EndpointIPv4, s.dst, s.src)
 	start := time.Now()
-	for _, port := range ports {
-		// Send one packet per loop iteration until we've sent packets
-		// to all of ports slice
-		start = time.Now()
-		tcp.DstPort = port
+	go func(){
+		for _, port := range ports {
+			// Send one packet per loop iteration until we've sent packets
+			// to all of ports slice
+			start = time.Now()
+			tcp.DstPort = port
 
-		if err := s.send(&eth, &ip4, &tcp); err != nil {
-			log.Printf("error sending to port %v: %v", tcp.DstPort, err)
+			if err := s.send(&eth, &ip4, &tcp); err != nil {
+				log.Printf("error sending to port %v: %v", tcp.DstPort, err)
+			}
+
 		}
-		// Time out 3 seconds after the last packet we sent.
+	}()
+	for {
+	// Time out 3 seconds after the last packet we sent.
 		if time.Since(start) > time.Second*3 {
 			log.Printf("timed out for %v, assuming we've seen all we can", s.dst)
 			return nil
@@ -279,9 +284,7 @@ func (s *scanner) scan(ports []layers.TCPPort) error {
 		} else {
 			// log.Printf("ignoring useless packet")
 		}
-		
 	}
-	return nil
 }
 
 // send sends the given layers as a single packet on the network.
